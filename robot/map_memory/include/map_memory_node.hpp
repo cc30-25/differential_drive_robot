@@ -1,59 +1,55 @@
-#ifndef MEMORY_MAP_NODE_HPP_
-#define MEMORY_MAP_NODE_HPP_
+#ifndef MAP_MEMORY_NODE_HPP_
+#define MAP_MEMORY_NODE_HPP_
 
 #include <memory>
 #include <vector>
 #include <limits>
 #include <cmath>
+
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Matrix3x3.h"
 
 #include "map_memory_core.hpp"
 
-class MemoryMapNode : public rclcpp::Node {
- public:
-    MemoryMapNode();
+class MapMemoryNode : public rclcpp::Node {
+  public:
+    MapMemoryNode();
 
-    void handleLocalMap(const nav_msgs::msg::OccupancyGrid::SharedPtr& msg);
-    void handleOdometry(const nav_msgs::msg::Odometry::SharedPtr& msg);
-    void onTimerEvent();
+  private:
+    void setupCommunication();
+    void initGlobalMap();
+    void costmapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
+    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
+    void updateMap();
+    double extractYaw(double x, double y, double z, double w);
+    void integrateCostmap(const nav_msgs::msg::OccupancyGrid::SharedPtr local_costmap, 
+                         double robot_x, double robot_y, double robot_theta);
+    bool robotToMap(double rx, double ry, int& mx, int& my);
 
-    // Utility function for quaternion to yaw conversion
-    double convertQuaternionToYaw(double qx, double qy, double qz, double qw) const;
-
-    void loadParameters();
-
- private:
-    // Core processing unit for global map updates
-    robot_system::MapMemoryCore memory_core_;
+    robot::MapMemoryCore map_memory_;
+    nav_msgs::msg::OccupancyGrid global_map_;
+    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr local_costmap_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr global_map_pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    double update_distance_ = 1.5;
+    int timer_interval_ = 3000;
     
-    // ROS2 communication interfaces
-    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr local_map_subscriber_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr global_map_publisher_;
-    rclcpp::TimerBase::SharedPtr update_timer_;
-
-    // ROS2 configuration parameters
-    std::string local_map_topic_;
-    std::string odometry_topic_;
-    std::string global_map_topic_;
-    int publish_rate_;
-    double grid_resolution_;
-    int grid_width_;
-    int grid_height_;
-    geometry_msgs::msg::Pose map_origin_;
-    double min_update_distance_;
-
-    // Robot state in simulation frame
-    double current_robot_x_;  
-    double current_robot_y_;  
-    double current_robot_yaw_;  
-
-    // Tracking last known robot position for update checks
-    double previous_robot_x_;
-    double previous_robot_y_;
+    double robot_x_ = 0.0;
+    double robot_y_ = 0.0;
+    double robot_theta_ = 0.0;
+    
+    double last_update_x_ = std::numeric_limits<double>::quiet_NaN();
+    double last_update_y_ = std::numeric_limits<double>::quiet_NaN();
+    
+    double resolution_ = 0.4;
+    int width_ = 80;
+    int height_ = 80;
+    geometry_msgs::msg::Pose origin_;
 };
 
-#endif  // MEMORY_MAP_NODE_HPP_
+#endif 
