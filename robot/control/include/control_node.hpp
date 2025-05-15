@@ -1,53 +1,52 @@
-#ifndef CONTROL_ENGINE_NODE_HPP_
-#define CONTROL_ENGINE_NODE_HPP_
+#ifndef CONTROL_NODE_HPP_
+#define CONTROL_NODE_HPP_
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
-
-#include "control_core.hpp"
+#include <utility>
 
 class ControlNode : public rclcpp::Node {
   public:
     ControlNode();
 
-
-    
-    void configureParameters();
- 
-    double quaternionToYaw(double x, double y, double z, double w);
-    // callback
-    void pathUpdateCallback(const nav_msgs::msg::Path::SharedPtr msg);
-    // update callback
-    void odometryUpdateCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
-    // Follow the path by generating control commands
-    void followTrajectory();
-    // regular path following
+    double extractYaw(double x, double y, double z, double w);
+    void pathCallback(const nav_msgs::msg::Path::SharedPtr msg);
+    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
+    void controlLoop();
     void timerCallback();
-  
+
   private:
-   robot::ControlCore control_;
-    // ROS2 subscriber and publisher
+    void setupCommunication();
+    bool isPathValid();
+    void stopRobot();
+    std::pair<size_t, double> findNearestPathPoint();
+    std::pair<size_t, double> findLookaheadPoint(size_t start_index);
+    bool isPathEndReached(size_t current_index, double distance);
+    geometry_msgs::msg::Twist computeSteeringCommand(size_t target_index);
+
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_subscriber_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
-    // Timer for periodic control updates
+
     rclcpp::TimerBase::SharedPtr timer_;
-    // Robot state tracking
+
+    nav_msgs::msg::Path current_path_;
     double robot_x_;
     double robot_y_;
     double robot_theta_;
-    // ROS2 parameters for configuration
-    std::string path_topic_;
-    std::string odom_topic_;
-    std::string cmd_vel_topic_;
+    bool have_path_;
+
+    const std::string path_topic_ = "/path";
+    const std::string odom_topic_ = "/odom/filtered";
+    const std::string cmd_vel_topic_ = "/cmd_vel";
     
-    int control_period_ms_;
-    double lookahead_distance_;
-    double steering_gain_;
-    double max_steering_angle_;
-    double linear_velocity_;
+    const int control_period_ms_ = 100;
+    const double lookahead_distance_ = 1.0;
+    const double steering_gain_ = 1.0;
+    const double max_steering_angle_ = 1.0;
+    const double linear_velocity_ = 0.5;
 };
 
 #endif
