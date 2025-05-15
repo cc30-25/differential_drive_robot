@@ -1,49 +1,52 @@
-#ifndef CONTROL_CORE_HPP_
-#define CONTROL_CORE_HPP_
+#ifndef CONTROL_NODE_HPP_
+#define CONTROL_NODE_HPP_
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include <utility>
 
-namespace robot
-{
-
-class ControlCore {
+class ControlNode : public rclcpp::Node {
   public:
-    // Constructor, we pass in the node's RCLCPP logger to enable logging to terminal
-    ControlCore(const rclcpp::Logger& logger);
+    ControlNode();
 
-    // Initializes core control parameters
-    void initializeControlCore(
-      double lookahead_distance,
-      double max_steering_angle, 
-      double steering_gain,
-      double linear_velocity
-    );
-
-    // Updates the current path
-    void updatePath(nav_msgs::msg::Path path);
-
-    // Checks if the path is empty
-    bool isPathEmpty();
-
-    // Finds the next lookahead point in the path
-    unsigned int findLookaheadPoint(double robot_x, double robot_y, double robot_theta);
-
-    // Calculates control commands based on the current robot state
-    geometry_msgs::msg::Twist calculateControlCommand(double robot_x, double robot_y, double robot_theta);
+    double extractYaw(double x, double y, double z, double w);
+    void pathCallback(const nav_msgs::msg::Path::SharedPtr msg);
+    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
+    void controlLoop();
+    void timerCallback();
 
   private:
-    nav_msgs::msg::Path path_;  // Current path for robot to follow
-    rclcpp::Logger logger_;     // Logger for debugging and terminal outputs
+    void setupCommunication();
+    bool isPathValid();
+    void stopRobot();
+    std::pair<size_t, double> findNearestPathPoint();
+    std::pair<size_t, double> findLookaheadPoint(size_t start_index);
+    bool isPathEndReached(size_t current_index, double distance);
+    geometry_msgs::msg::Twist computeSteeringCommand(size_t target_index);
 
-    // Control parameters
-    double lookahead_distance_;
-    double max_steering_angle_;
-    double steering_gain_;
-    double linear_velocity_;
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_subscriber_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber_;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
+
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    nav_msgs::msg::Path current_path_;
+    double robot_x_;
+    double robot_y_;
+    double robot_theta_;
+    bool have_path_;
+
+    const std::string path_topic_ = "/path";
+    const std::string odom_topic_ = "/odom/filtered";
+    const std::string cmd_vel_topic_ = "/cmd_vel";
+    
+    const int control_period_ms_ = 100;
+    const double lookahead_distance_ = 1.0;
+    const double steering_gain_ = 1.0;
+    const double max_steering_angle_ = 1.0;
+    const double linear_velocity_ = 0.5;
 };
-
-}  // namespace robot
 
 #endif
