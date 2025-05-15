@@ -1,31 +1,33 @@
 #ifndef COSTMAP_NODE_HPP_
 #define COSTMAP_NODE_HPP_
-
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
-
-#include "costmap_core.hpp"
-
+#include "geometry_msgs/msg/pose.hpp"
+#include <memory>
+#include <vector>
+ 
 class CostmapNode : public rclcpp::Node {
   public:
     CostmapNode();
+    void laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
     
-    void publishMessage();
-    
-    void handleLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg) const;
-
   private:
-    robot::CostmapCore costmap_processor_;
-    std::string scan_topic_;
-    std::string map_topic_;
-    double map_resolution_;
-    int map_width_;
-    int map_height_;
-    geometry_msgs::msg::Pose map_origin_;
-    double cost_inflation_radius_;
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_scan_subscription_;
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr costmap_publisher_;
+    void updateCostmap(const sensor_msgs::msg::LaserScan::SharedPtr laserscan);
+    void inflateObstacle(int origin_x, int origin_y);
+   void setupCommunication();
+    void initializeCostmap();
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_scan_sub_;
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr costmap_pub_;
+    std::shared_ptr<nav_msgs::msg::OccupancyGrid> costmap_data_;
+    const std::string laser_topic_ = "/lidar";
+    const std::string costmap_topic_ = "/costmap";
+    double resolution_ = 0.2;
+    int width_ = 240;
+    int height_ = 240;
+    geometry_msgs::msg::Pose origin_{};  
+    double inflation_radius_ = 1.5;
+    int inflation_cells_; 
 };
-
+ 
 #endif
